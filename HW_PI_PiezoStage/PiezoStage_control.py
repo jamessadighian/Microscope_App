@@ -51,7 +51,7 @@ class PiezoStageControl(Measurement):
                 
     def move_up(self):
         if hasattr(self, 'pi_device') and hasattr(self, 'axes'):
-            self.pi_device.MVR(axes=self.axes[1], values=[self.settings['step_size']])
+            self.pi_device.MVR(axes=self.axes[2], values=[self.settings['step_size']])
             self.pi_device_hw.read_from_hardware()
             self.current_stage_pos_arrow.setPos(self.pi_device_hw.settings['x_position'], self.pi_device_hw.settings['y_position'])
 
@@ -63,7 +63,7 @@ class PiezoStageControl(Measurement):
 
     def move_down(self):
         if hasattr(self, 'pi_device') and hasattr(self, 'axes'):
-            self.pi_device.MVR(axes=self.axes[1], values=[-self.settings['step_size']])
+            self.pi_device.MVR(axes=self.axes[2], values=[-self.settings['step_size']])
             self.pi_device_hw.read_from_hardware()
             self.current_stage_pos_arrow.setPos(self.pi_device_hw.settings['x_position'], self.pi_device_hw.settings['y_position'])
 

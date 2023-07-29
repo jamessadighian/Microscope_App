@@ -35,7 +35,12 @@ class PiezoStageHW(HardwareComponent):
         self.pi_device = GCSDevice("E-710")	# Creates a Controller instant
         self.pi_device.ConnectNIgpib(board=0,device=4) # Connect to GPIB board
 
-        self.axes = self.pi_device.axes[0:2] # selecting x and y axis of the stage
+        # self.axes = self.pi_device.axes[0:2] # selecting x and y axis of the stage
+        
+        aux_arr = np.array(self.pi_device.axes) # turn list in numpy array
+        access_arr = aux_arr[[0,2]] # select x and z from numpy array
+        self.axes = list(access_arr) # convert numpy array to list, set as axis
+        
         self.pi_device.INI()
         self.pi_device.REF(axes=self.axes)
         self.pi_device.SVO(axes=self.axes, values=[True,True])	# Turn on servo control for both axes
@@ -85,4 +90,4 @@ class PiezoStageHW(HardwareComponent):
         return self.pi_device.qPOS(axes=self.axes)['1']
 
     def getY(self):
-        return self.pi_device.qPOS(axes=self.axes)['2']
+        return self.pi_device.qPOS(axes=self.axes)['3']

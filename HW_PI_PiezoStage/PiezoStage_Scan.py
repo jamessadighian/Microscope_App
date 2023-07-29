@@ -8,6 +8,7 @@ import os.path
 from pyqtgraph.Qt import QtGui, QtCore
 from pyqtgraph.Point import Point
 import customplotting.mscope as cpm
+import matplotlib.pyplot as plt
 
 class PiezoStage_Scan(Measurement):
     name = "PiezoStage_Scan"
@@ -23,6 +24,7 @@ class PiezoStage_Scan(Measurement):
         # This file can be edited graphically with Qt Creator
         # sibling_path function allows python to find a file in the same folder
         # as this python module
+        #self.ui_filename = sibling_path(__file__, "stage_scan.ui")
         self.ui_filename = sibling_path(__file__, "stage_scan.ui")
         
         #Load ui file and convert it to a live QWidget of the user interface
@@ -42,19 +44,25 @@ class PiezoStage_Scan(Measurement):
         self.settings.New('x_step', dtype=float, initial=1, unit='um', vmin=-99, vmax=99)#vmin=.001)
         self.settings.New('y_step', dtype=float, initial=1, unit='um', vmin=-99, vmax=99)#vmin=.001)
 
-        self.settings.New('x_clicked', dtype=float, initial=0, unit='um', vmin=0, vmax=100, ro=True)
-        self.settings.New('y_clicked', dtype=float, initial=0, unit='um', vmin=0, vmax=100, ro=True)
+        self.settings.New('x_clicked', dtype=float, initial=0, unit='um', vmin=0, vmax=100)#, ro=True)
+        self.settings.New('y_clicked', dtype=float, initial=0, unit='um', vmin=0, vmax=100)#, ro=True)
 
         self.settings.New('lock_position', dtype=bool, initial=False)
         self.settings.New('save_positions', dtype=bool, initial=False)
 
+        
+        '''
+        '''
         self.update_ranges()
         
         # Define how often to update display during a run
         self.display_update_period = .3
         
         # Convenient reference to the hardware used in the measurement
+        #self.spec_hw = self.app.hardware['oceanoptics']
         self.pi_device_hw = self.app.hardware['piezostage']
+        
+        #self.spec_measure = self.app.measurements['oceanoptics_measure']
 
         self.scan_complete = False
 
@@ -83,6 +91,8 @@ class PiezoStage_Scan(Measurement):
         self.settings.lock_position.connect_to_widget(self.ui.lock_position_checkBox)
         self.settings.save_positions.connect_to_widget(self.ui.save_positions_checkBox)
         self.settings.progress.connect_to_widget(self.ui.progressBar)
+
+
 
         #stage ui base
         self.stage_layout=pg.GraphicsLayoutWidget()
@@ -157,17 +167,13 @@ class PiezoStage_Scan(Measurement):
                 self.selected_positions[self.selected_count, 0] = mousePoint.x()
                 self.selected_positions[self.selected_count, 1] = mousePoint.y()
                 self.selected_count += 1
-                if self.pi_device_hw.settings["debug_mode"]:
-                    print("Point appended.")
 
     def export_positions(self):
         """ Export selected positions into txt. """
         self.check_filename("_selected_positions.txt")
         trimmed = self.selected_positions[~np.all(self.selected_positions == 0, axis=1)] #get rid of empty rows
         np.savetxt(self.app.settings['save_dir']+"/"+ self.app.settings['sample'] + "_selected_positions.txt", trimmed, fmt='%f')
-        if self.pi_device_hw.settings["debug_mode"]:
-            print("Selected points saved.")
-            
+
     def move_to_selected(self):
         """Move stage to position selected by crosshairs."""
         if self.scan_complete and hasattr(self, 'pi_device'):
@@ -295,29 +301,35 @@ class PiezoStage_Scan(Measurement):
     def run(self):
         self.scan_complete = False
         self.pixels_scanned = 0 #keep track of scan/'pixel' number
-        t2 = time.time()
+        print("before if")
+        print("before for loop x_step: {}".format(self.x_step))
         if (self.settings['scan_direction'] == 'XY'): #xy scan
-            for i in range(self.y_range):
-                for j in range(self.x_range):
-                    t0 = time.time()
+            print("inside if, before loop")
+            print("y_range: {}".format(self.y_range))
+            for i in range(0, self.y_range):
+                print("inside for loop")
+                print("y_range: {}".format(self.y_range))
+                print(self.pixels_scanned) # testing
+                print("x_range: {}".format(self.x_range))
+                for j in range(0, self.x_range):
+                    print("inside inner for loop")
+                    print(self.pixels_scanned)
                     if self.interrupt_measurement_called:
                         break
                     #make sure the right indices of image arrays are updated
                     self.index_x = j
                     self.index_y = i
+                    print("inside for loop x_step: {}".format(self.x_step))
                     if self.x_step < 0:
                         self.index_x = self.x_range - j - 1
                     if self.y_step < 0:
                         self.index_y = self.y_range - i - 1
-                    t1 = time.time()
+                    print("before scan_measure y_range: {}".format(self.y_range))
                     self.scan_measure() #defined in hardware-specific scans
-                    if self.pi_device_hw.settings["debug_mode"]:
-                        print("Scan measure time: " + str(time.time() - t1))
+                    print("after scan_measure y_range: {}".format(self.y_range))
                     self.pi_device.MVR(axes=self.axes[0], values=[self.x_step])
+                    print("after MVR y_range: {}".format(self.y_range))
                     self.pixels_scanned+=1
-
-                    if self.pi_device_hw.settings["debug_mode"]:
-                        print("Pixel scan time: " + str(time.time() - t0) )
                 # TODO
                 # if statement needs to be modified to keep the stage at the finish y-pos for line scans in x, and same for y
                 if i == self.y_range-1: # this if statement is there to keep the stage at the finish position (in x) and not bring it back like we were doing during the scan 
@@ -327,11 +339,14 @@ class PiezoStage_Scan(Measurement):
                     self.pi_device.MOV(axes=self.axes[0], values=[self.x_start])
                 if self.interrupt_measurement_called:
                     break
+            print("exit nested for loops")
+            print(self.pixels_scanned)
         elif (self.settings['scan_direction'] == 'YX'): #yx scan
-            
+            print("inside elif branch")
             for i in range(self.x_range):
+                print("inside second for loop")
                 for j in range(self.y_range):
-                    t0 = time.time()
+                    print("inside second inner for loop")
                     if self.interrupt_measurement_called:
                         break
 
@@ -342,17 +357,9 @@ class PiezoStage_Scan(Measurement):
                         self.index_x = self.x_range - i - 1
                     if self.y_step < 0:
                         self.index_y = self.y_range - j - 1
-
-                    t1 = time.time()
                     self.scan_measure()
-                    if self.pi_device_hw.settings["debug_mode"]:
-                        print("Scan measure time: " + str(time.time()-t1))
-
                     self.pi_device.MVR(axes=self.axes[1], values=[self.y_step])
                     self.pixels_scanned+=1
-
-                    if self.pi_device_hw.settings["debug_mode"]:
-                        print("Pixel scan time: " + str(time.time() - t0))
                 # TODO
                 # if statement needs to be modified to keep the stage at the finish y-pos for line scans in x, and same for y
                 if i == self.x_range-1: # this if statement is there to keep the stage at the finish position (in x) and not bring it back like we were doing during the scan 
@@ -362,9 +369,10 @@ class PiezoStage_Scan(Measurement):
                     self.pi_device.MOV(axes=self.axes[1], values=[self.y_start])
                 if self.interrupt_measurement_called:
                     break
-        if self.pi_device_hw.settings["debug_mode"]:
-            print("Total scan time: " + str(time.time() - t2))
+                print("exit elif branch")
         self.scan_complete = True
+        print("scan complete")
+        print(self.pixels_scanned)
         
     def post_run(self):
         """Re-enable roi and spinboxes. """
@@ -373,8 +381,6 @@ class PiezoStage_Scan(Measurement):
         self.scan_roi.translatable = True
         for lqname in "scan_direction x_start y_start x_size y_size x_step y_step".split():
             self.settings.as_dict()[lqname].change_readonly(False)
-        if self.pi_device_hw.settings["debug_mode"]:
-            print("Scan complete.")
             
     def scan_measure(self):
         """
@@ -423,9 +429,6 @@ class PiezoStage_Scan(Measurement):
         transposed = np.transpose(intensities_array)
         np.savetxt(self.app.settings['save_dir']+"/"+ self.app.settings['sample'] + append, transposed, fmt='%f')
 
-        if self.pi_device_hw.settings["debug_mode"]:
-            print("Intensities array saved.")
-
     def save_intensities_image(self, intensities_array, hw_name):
         """
         intensities_array - array of intensities to save as image
@@ -434,6 +437,19 @@ class PiezoStage_Scan(Measurement):
         append = '_' + hw_name + '_intensity_sums.png'
         cpm.plot_confocal(intensities_array, stepsize=np.abs(self.settings['x_step']))
         self.check_filename(append)
-        cpm.plt.savefig(self.app.settings['save_dir'] + '/' + self.app.settings['sample'] + append, bbox_inches='tight', dpi=300)
-        if self.pi_device_hw.settings["debug_mode"]:
-            print("Intensities image saved.")
+        plt.savefig(self.app.settings['save_dir'] + '/' + self.app.settings['sample'] + append, bbox_inches='tight', dpi=300)
+        
+    def save_histogram_arrays(self, data_array, time_array, hw_name):
+        """
+        data_array - 2D array of 1D arrays storing intensities
+        time_array - 2D array of 1D arrays storing times
+        hw_name - string that describes intensities source (ie. oo for oceanoptics, ph for picoharp) 
+        """
+        append_data = '_' + hw_name + '_intensity_arr.npy'
+        append_time = '_' + hw_name + '_time_arr.npy'
+        self.check_filename(append_data)
+        self.check_filename(append_time)
+        np.save(self.app.settings['save_dir']+"/"+ self.app.settings['sample'] + append_data, data_array)
+        np.save(self.app.settings['save_dir']+"/"+ self.app.settings['sample'] + append_time, time_array)
+
+    
